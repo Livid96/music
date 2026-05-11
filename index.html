@@ -2131,39 +2131,124 @@ const INV_INSTANCES = [
   'https://iv.melmac.space',
   'https://invidious.nerdvpn.de',
   'https://invidious.io.lol',
+  'https://invidious.perennialte.ch',
+  'https://yt.artemislena.eu',
+  'https://invidious.reallyaweso.me',
+  'https://inv.nadeko.net',
 ];
+
+const PIPED_INSTANCES = [
+  'https://pipedapi.kavin.rocks',
+  'https://pipedapi.tokhmi.xyz',
+  'https://pipedapi.moomoo.me',
+];
+
+// ===== YT IFRAME FALLBACK =====
+let _ytIframeActive = false;
+let _ytIframeSong = null;
+
+function _getOrCreateYTContainer() {
+  let c = document.getElementById('yt-iframe-container');
+  if (!c) {
+    c = document.createElement('div');
+    c.id = 'yt-iframe-container';
+    c.style.cssText = 'position:fixed;bottom:110px;right:20px;width:320px;height:180px;border-radius:12px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.1);z-index:200;display:none;flex-direction:column;background:#000;';
+    // header bar
+    const bar = document.createElement('div');
+    bar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:rgba(0,0,0,0.8);font-size:12px;color:#fff;font-family:var(--font-body);gap:8px;flex-shrink:0;';
+    bar.innerHTML = '<span style="display:flex;align-items:center;gap:6px;"><i class="fab fa-youtube" style="color:#ff4444;"></i> <span id="yt-iframe-label" style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">YouTube Fallback</span></span><button onclick="closeYTIframe()" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:16px;line-height:1;">&times;</button>';
+    c.appendChild(bar);
+    document.body.appendChild(c);
+  }
+  return c;
+}
+
+function closeYTIframe() {
+  const c = document.getElementById('yt-iframe-container');
+  if (c) c.style.display = 'none';
+  _ytIframeActive = false;
+  audio.pause();
+  state.isPlaying = false;
+  updatePlayerUI();
+}
+
+function _playViaYTIframe(song) {
+  const c = _getOrCreateYTContainer();
+  // Remove old iframe
+  const old = c.querySelector('iframe');
+  if (old) old.remove();
+
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'width:100%;flex:1;border:none;display:block;';
+  iframe.allow = 'autoplay; encrypted-media';
+  iframe.allowFullscreen = false;
+  iframe.src = `https://www.youtube-nocookie.com/embed/${song.ytId}?autoplay=1&controls=1&rel=0&modestbranding=1`;
+  c.appendChild(iframe);
+
+  document.getElementById('yt-iframe-label').textContent = song.title;
+  c.style.display = 'flex';
+  _ytIframeActive = true;
+  _ytIframeSong = song;
+
+  // Sync state: audio element won't play, but we mark as playing for UI
+  state.isPlaying = true;
+  updatePlayerUI();
+  toast('▶️ Playing via YouTube embed (no audio controls)', 'info');
+}
 
 function _tryPlaySrc(song, src) {
   return new Promise((resolve, reject) => {
     audio.pause();
     audio.src = src;
     const onCanPlay = () => {
-      audio.removeEventListener('canplay', onCanPlay);
-      audio.removeEventListener('error', onError);
+      cleanup();
       audio.play().then(resolve).catch(e => {
         if (e.name === 'AbortError') resolve(); else reject(e);
       });
     };
-    const onError = () => {
+    const onError = () => { cleanup(); reject(new Error('Source failed')); };
+    const cleanup = () => {
       audio.removeEventListener('canplay', onCanPlay);
       audio.removeEventListener('error', onError);
-      reject(new Error('Source failed'));
+      clearTimeout(timer);
     };
     audio.addEventListener('canplay', onCanPlay);
     audio.addEventListener('error', onError);
     audio.load();
-    // Timeout if canplay never fires (e.g. instance returns 200 but no audio)
-    setTimeout(() => { audio.removeEventListener('canplay', onCanPlay); audio.removeEventListener('error', onError); reject(new Error('Timeout')); }, 8000);
+    // 6s timeout — faster fail so we move to next source quicker
+    const timer = setTimeout(() => { cleanup(); reject(new Error('Timeout')); }, 6000);
   });
+}
+
+// Try to resolve a direct audio URL via Piped API
+async function _tryPipedAudio(ytId) {
+  for (const base of PIPED_INSTANCES) {
+    try {
+      const r = await fetch(`${base}/streams/${ytId}`, { signal: AbortSignal.timeout(5000) });
+      if (!r.ok) continue;
+      const data = await r.json();
+      // audioStreams sorted by quality; pick highest bitrate m4a/webm
+      const streams = (data.audioStreams || []).filter(s => s.url);
+      if (!streams.length) continue;
+      streams.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+      return streams[0].url;
+    } catch { continue; }
+  }
+  return null;
 }
 
 async function loadAndPlay(song) {
   if (!song) return;
+
+  // Close any active YT iframe from a previous song
+  const oldContainer = document.getElementById('yt-iframe-container');
+  if (oldContainer) { oldContainer.style.display = 'none'; const oi = oldContainer.querySelector('iframe'); if (oi) oi.remove(); }
+  _ytIframeActive = false;
+
   state.currentSong = song;
   updatePlayerUI();
 
   if (!song.isYT) {
-    // Local / URL-based song
     const src = song.url || null;
     if (!src) { toast('No audio source for this song', 'info'); return; }
     try {
@@ -2178,27 +2263,63 @@ async function loadAndPlay(song) {
     return;
   }
 
-  // YouTube song — try Invidious instances one by one
-  // Start with the last known working instance
-  const preferred = state.invidiousBase ? [state.invidiousBase, ...INV_INSTANCES.filter(i => i !== state.invidiousBase)] : INV_INSTANCES;
+  // ── YouTube song: multi-strategy streaming ──
+  // Strategy 1: Last known working Invidious instance first
+  const preferred = state.invidiousBase
+    ? [state.invidiousBase, ...INV_INSTANCES.filter(i => i !== state.invidiousBase)]
+    : INV_INSTANCES;
+
+  // Try first 3 Invidious instances in parallel for speed
+  const firstBatch = preferred.slice(0, 3);
+  const restBatch  = preferred.slice(3);
 
   let played = false;
-  for (const base of preferred) {
+
+  // Parallel race on first 3
+  const raceResult = await Promise.any(firstBatch.map(async base => {
     const src = `${base}/latest_version?id=${song.ytId}&itag=140`;
-    try {
-      await _tryPlaySrc(song, src);
-      state.invidiousBase = base; // remember working instance
-      state.isPlaying = true;
-      played = true;
-      break;
-    } catch {
-      continue;
+    await _tryPlaySrc(song, src);
+    return base;
+  })).catch(() => null);
+
+  if (raceResult) {
+    state.invidiousBase = raceResult;
+    state.isPlaying = true;
+    played = true;
+  }
+
+  // Strategy 2: Sequential fallback through remaining Invidious instances
+  if (!played) {
+    for (const base of restBatch) {
+      const src = `${base}/latest_version?id=${song.ytId}&itag=140`;
+      try {
+        await _tryPlaySrc(song, src);
+        state.invidiousBase = base;
+        state.isPlaying = true;
+        played = true;
+        break;
+      } catch { continue; }
     }
   }
 
+  // Strategy 3: Piped API (get a direct CDN URL)
   if (!played) {
-    toast('Could not stream this song — all Invidious servers failed. Try again later.', 'error');
-    state.isPlaying = false;
+    toast('Invidious unavailable, trying Piped…', 'info');
+    try {
+      const directUrl = await _tryPipedAudio(song.ytId);
+      if (directUrl) {
+        await _tryPlaySrc(song, directUrl);
+        state.isPlaying = true;
+        played = true;
+      }
+    } catch { /* fall through */ }
+  }
+
+  // Strategy 4: YouTube embed iframe as last resort
+  if (!played) {
+    _playViaYTIframe(song);
+    recordPlay(song);
+    return; // UI updated inside _playViaYTIframe
   }
 
   updatePlayerUI();
