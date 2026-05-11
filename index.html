@@ -1430,34 +1430,21 @@ input[type=color] {
         <input type="text" class="form-input" id="yt-pl-url"
           placeholder="https://www.youtube.com/playlist?list=PL…"
           oninput="onPlUrlChange()" onpaste="setTimeout(onPlUrlChange,10)"
-          autocomplete="off" autocorrect="off" spellcheck="false">
-        <div style="font-size:11px;color:var(--text3);margin-top:5px;">
-          Paste any YouTube playlist link — no API key needed. Works with public playlists.
-        </div>
+          autocomplete="off" spellcheck="false">
+        <div style="font-size:11px;color:var(--text3);margin-top:5px;">Paste any YouTube playlist link — fetches automatically. No API key needed.</div>
       </div>
-
-      <!-- Progress bar -->
       <div id="yt-pl-progress" style="display:none;flex-direction:column;gap:6px;margin-bottom:12px;">
         <div style="height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;">
-          <div id="yt-pl-progress-bar" style="height:100%;background:var(--accent);border-radius:2px;transition:width 300ms ease;width:0%;"></div>
+          <div id="yt-pl-progress-bar" style="height:100%;background:var(--accent);border-radius:2px;transition:width 300ms;width:0%;"></div>
         </div>
         <div id="yt-pl-progress-text" style="font-size:11px;color:var(--text2);font-family:monospace;">Fetching…</div>
       </div>
-
-      <!-- Preview list -->
-      <div id="yt-pl-preview" style="display:none;max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:10px;">
-      </div>
-
-      <!-- Meta line -->
-      <div id="yt-pl-meta" style="display:none;font-size:12px;color:var(--text2);margin-bottom:10px;display:flex;align-items:center;gap:8px;"></div>
-
-      <!-- Checkbox: use video titles -->
+      <div id="yt-pl-preview" style="display:none;max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:10px;"></div>
+      <div id="yt-pl-meta" style="display:none;font-size:12px;color:var(--text2);margin-bottom:10px;align-items:center;gap:8px;"></div>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);cursor:pointer;margin-bottom:4px;">
         <input type="checkbox" id="yt-pl-use-title" checked style="accent-color:var(--accent);width:14px;height:14px;">
         Use video titles as song titles
       </label>
-
-      <!-- Status/error -->
       <div id="yt-pl-status" style="display:none;padding:10px 14px;border-radius:10px;font-size:13px;margin-top:6px;"></div>
     </div>
 
@@ -1639,6 +1626,18 @@ function init() {
   });
 
   updateGhStatus();
+
+  // Auto-load music.json from the same folder as this file
+  fetch('./music.json?_=' + Date.now())
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      if (!data) return;
+      let added = 0;
+      if (data.songs) data.songs.forEach(s => { if (!state.songs.find(e => e.id === s.id)) { state.songs.push(s); added++; } });
+      if (data.playlists) data.playlists.forEach(p => { if (!state.playlists.find(e => e.id === p.id)) state.playlists.push(p); });
+      if (added > 0) { saveState(); renderAll(); }
+    })
+    .catch(() => {});
 }
 
 function updateGreeting() {
@@ -1911,7 +1910,7 @@ function switchYtTab(tab) {
     b.classList.toggle('active', (i === 0 && tab === 'single') || (i === 1 && tab === 'playlist'));
   });
   const previewBtn = document.getElementById('yt-preview-btn');
-  previewBtn.style.display = tab === 'single' ? '' : 'none';
+  if (previewBtn) previewBtn.style.display = tab === 'single' ? '' : 'none';
 }
 
 function addYouTubeOrPlaylist() {
@@ -1986,253 +1985,98 @@ function _addYTSong(ytId, title, artist) {
   return true;
 }
 
-// ===== SMART PLAYLIST EXTRACTOR (multi-strategy) =====
-let _plVideos = [];
-let _plFetching = false;
-let _plDebounce = null;
+async function addYTPlaylist() {
+  const apiUrl = document.getElementById('yt-pl-url').value.trim();
+  const statusEl = document.getElementById('yt-pl-status');
 
-function onPlUrlChange() {
-  clearTimeout(_plDebounce);
-  _plDebounce = setTimeout(_triggerPlFetch, 700);
-}
+  if (!apiUrl) { toast('Please enter an Invidious API URL', 'error'); return; }
 
-function _plSetProgress(pct, text) {
-  const bar = document.getElementById('yt-pl-progress-bar');
-  const txt = document.getElementById('yt-pl-progress-text');
-  if (bar) bar.style.width = pct + '%';
-  if (txt) txt.textContent = text;
-}
-
-function _plShowError(msg) {
-  const st = document.getElementById('yt-pl-status');
-  if (!st) return;
-  st.style.display = 'block';
-  st.style.background = 'rgba(255,100,100,0.1)';
-  st.style.color = '#ff6464';
-  st.style.border = '1px solid rgba(255,100,100,0.2)';
-  st.innerHTML = msg;
-  const prog = document.getElementById('yt-pl-progress');
-  if (prog) prog.style.display = 'none';
-  document.getElementById('yt-add-btn').disabled = (activeYtTab === 'playlist');
-}
-
-function _plClearStatus() {
-  const st = document.getElementById('yt-pl-status');
-  if (st) st.style.display = 'none';
-}
-
-function _extractPlaylistId(url) {
-  url = (url || '').trim();
-  try {
-    const u = new URL(url);
-    const list = u.searchParams.get('list');
-    if (list) return list;
-  } catch {}
-  const m = url.match(/[?&]list=([^&\s]+)/);
-  if (m) return m[1];
-  if (/^PL[a-zA-Z0-9_-]{10,}$/.test(url)) return url;
-  return null;
-}
-
-async function _tryInvidious(playlistId) {
-  const INSTANCES = [
-    'https://invidious.fdn.fr', 'https://yewtu.be', 'https://invidious.lunar.icu',
-    'https://inv.tux.pizza', 'https://invidious.privacyredirect.com',
-    'https://invidious.perennialte.ch', 'https://iv.melmac.space',
-    'https://yt.artemislena.eu', 'https://invidious.reallyaweso.me',
-    'https://invidious.nerdvpn.de', 'https://invidious.io.lol', 'https://inv.nadeko.net',
-  ];
-  for (const base of INSTANCES) {
-    try {
-      const videos = []; let page = 1; let name = 'Playlist';
-      while (page <= 20) {
-        const r = await fetch(`${base}/api/v1/playlists/${playlistId}?page=${page}`, {signal: AbortSignal.timeout(7000)});
-        if (!r.ok) break;
-        const d = await r.json();
-        if (page === 1) name = d.title || 'Playlist';
-        const vids = d.videos || [];
-        if (!vids.length) break;
-        for (const v of vids) { if (v.videoId) videos.push({title: v.title || '', videoId: v.videoId, artist: v.author || 'YouTube'}); }
-        _plSetProgress(30 + page * 3, `Fetching… ${videos.length} videos`);
-        if (vids.length < 100) break;
-        page++;
-      }
-      if (videos.length) return {videos, name, source: 'Invidious'};
-    } catch { continue; }
-  }
-  return null;
-}
-
-async function _tryRSSProxy(playlistId) {
-  const rssUrl = `https://www.youtube.com/feeds/videos.xml?playlist_id=${playlistId}`;
-  const proxies = [
-    `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`,
-    `https://corsproxy.io/?${encodeURIComponent(rssUrl)}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rssUrl)}`,
-  ];
-  for (const proxy of proxies) {
-    try {
-      const r = await fetch(proxy, {signal: AbortSignal.timeout(8000)});
-      if (!r.ok) continue;
-      const j = await r.json().catch(() => null);
-      const xmlStr = j ? (j.contents || j.data || '') : await r.text();
-      if (!xmlStr || !xmlStr.includes('<entry>')) continue;
-      const xml = new DOMParser().parseFromString(xmlStr, 'application/xml');
-      const entries = xml.querySelectorAll('entry');
-      const videos = [];
-      entries.forEach(entry => {
-        const idEl = entry.getElementsByTagNameNS('http://www.youtube.com/xml/schemas/2015','videoId')[0];
-        const id = (idEl?.textContent || '').trim();
-        const title = entry.querySelector('title')?.textContent || '';
-        if (id) videos.push({title, videoId: id, artist: 'YouTube'});
-      });
-      const name = xml.querySelector('title')?.textContent || 'Playlist';
-      if (videos.length) return {videos, name, source: 'RSS'};
-    } catch { continue; }
-  }
-  return null;
-}
-
-async function _tryScrapeProxy(playlistId) {
-  const ytUrl = `https://www.youtube.com/playlist?list=${playlistId}`;
-  const proxies = [
-    `https://api.allorigins.win/get?url=${encodeURIComponent(ytUrl)}`,
-    `https://corsproxy.io/?${encodeURIComponent(ytUrl)}`,
-  ];
-  for (const proxy of proxies) {
-    try {
-      const r = await fetch(proxy, {signal: AbortSignal.timeout(10000)});
-      if (!r.ok) continue;
-      const j = await r.json().catch(() => null);
-      const html = j ? (j.contents || '') : await r.text();
-      if (!html) continue;
-      const name = (html.match(/<title>([^<]+)<\/title>/) || [])[1]?.replace(' - YouTube','') || 'Playlist';
-      const ids = [...new Set([...html.matchAll(/"videoId":"([a-zA-Z0-9_-]{11})"/g)].map(m => m[1]))];
-      const titles = [...html.matchAll(/"title":\{"runs":\[{"text":"([^"]+)"\}/g)].map(m => m[1]);
-      const videos = ids.map((id, i) => ({videoId: id, title: titles[i] || '', artist: 'YouTube'}));
-      if (videos.length) return {videos, name, source: 'Scraped'};
-    } catch { continue; }
-  }
-  return null;
-}
-
-async function _fetchPlaylist(playlistId) {
-  _plSetProgress(10, 'Trying Invidious API…');
-  let result = await _tryInvidious(playlistId);
-  if (result) return result;
-  _plSetProgress(55, 'Trying RSS feed…');
-  result = await _tryRSSProxy(playlistId);
-  if (result) return result;
-  _plSetProgress(75, 'Trying page scrape…');
-  result = await _tryScrapeProxy(playlistId);
-  if (result) return result;
-  throw new Error('All fetch methods failed. Make sure the playlist is <b>Public</b> on YouTube and try again.');
-}
-
-async function _triggerPlFetch() {
-  if (_plFetching) return;
-  const url = document.getElementById('yt-pl-url').value.trim();
-  _plClearStatus();
-  const preview = document.getElementById('yt-pl-preview');
-  const meta = document.getElementById('yt-pl-meta');
-  const prog = document.getElementById('yt-pl-progress');
-  preview.style.display = 'none'; preview.innerHTML = '';
-  meta.style.display = 'none';
-  document.getElementById('yt-add-btn').disabled = true;
-  _plVideos = [];
-
-  if (!url) return;
-
-  const listId = _extractPlaylistId(url);
-  if (!listId) {
-    _plShowError('No playlist ID found. Paste a YouTube playlist URL containing <b>list=PL…</b>');
+  // Validate it looks like an Invidious playlists endpoint
+  if (!apiUrl.includes('/api/v1/playlists/')) {
+    toast('URL must contain /api/v1/playlists/<id>', 'error');
     return;
   }
 
-  prog.style.display = 'flex';
-  _plFetching = true;
+  statusEl.style.display = 'block';
+  statusEl.style.background = 'rgba(var(--accent-rgb),0.1)';
+  statusEl.style.color = 'var(--accent)';
+  statusEl.style.border = '1px solid rgba(var(--accent-rgb),0.2)';
+  statusEl.textContent = 'Fetching playlist from Invidious...';
 
-  try {
-    const result = await _fetchPlaylist(listId);
-    _plFetching = false;
-    _plVideos = result.videos;
-
-    if (!_plVideos.length) {
-      _plShowError('Playlist found but returned 0 videos. It may be private or empty.');
-      return;
-    }
-
-    _plSetProgress(100, `✓ ${_plVideos.length} videos loaded via ${result.source}`);
-
-    // Render preview list
-    preview.innerHTML = _plVideos.map((v, i) =>
-      `<div style="display:flex;align-items:center;gap:8px;padding:7px 11px;border-bottom:1px solid var(--border);font-size:12px;">
-        <span style="font-family:monospace;font-size:10px;color:var(--text3);min-width:24px;">${i+1}</span>
-        <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${v.title}">${v.title || '(no title)'}</span>
-        <span style="font-family:monospace;font-size:10px;color:var(--accent);flex-shrink:0;">${v.videoId}</span>
-      </div>`
-    ).join('');
-    preview.style.display = 'block';
-
-    meta.style.display = 'flex';
-    meta.innerHTML = `<strong style="color:var(--text);">${result.name}</strong>
-      <span style="background:rgba(52,211,153,0.15);color:#34d399;border:1px solid rgba(52,211,153,0.3);border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;font-family:monospace;">${_plVideos.length} videos</span>`;
-
-    document.getElementById('yt-add-btn').disabled = false;
-    setTimeout(() => { prog.style.display = 'none'; }, 2000);
-  } catch(e) {
-    _plFetching = false;
-    _plShowError(e.message || 'Failed to fetch playlist.');
-  }
-}
-
-async function addYTPlaylist() {
-  if (!_plVideos.length) {
-    // If videos not loaded yet (user clicked Add before auto-fetch), try fetching first
-    const url = document.getElementById('yt-pl-url').value.trim();
-    if (!url) { toast('Paste a YouTube playlist URL first', 'error'); return; }
-    await _triggerPlFetch();
-    if (!_plVideos.length) return;
-  }
-
-  const useTitle = document.getElementById('yt-pl-use-title').checked;
   const btn = document.getElementById('yt-add-btn');
   btn.disabled = true;
 
-  let added = 0;
-  const songIds = [];
-  for (const v of _plVideos) {
-    const title = useTitle && v.title ? v.title : 'YouTube Song';
-    const artist = v.artist || 'YouTube';
-    if (v.videoId && _addYTSong(v.videoId, title, artist)) { added++; }
-    const id = 'yt_' + v.videoId;
-    if (state.songs.find(s => s.id === id)) songIds.push(id);
-  }
+  try {
+    // Invidious returns all videos in one call; strip any trailing params, add fields
+    const baseUrl = apiUrl.split('?')[0];
+    let allVideos = [];
+    let playlistTitle = 'YouTube Playlist';
+    let page = 1;
 
-  // Create a SoundVault playlist for the imported set
-  if (songIds.length > 0) {
-    const meta = document.getElementById('yt-pl-meta');
-    const rawName = meta?.querySelector('strong')?.textContent || 'YouTube Playlist';
-    const newPl = {
-      id: 'pl_yt_' + Date.now(),
-      name: rawName,
-      desc: 'Imported from YouTube playlist',
-      emoji: '▶️',
-      songs: songIds
-    };
-    state.playlists.push(newPl);
-  }
+    // Invidious paginates via ?page=N (each page = up to 100 videos)
+    while (true) {
+      const res = await fetch(`${baseUrl}?page=${page}`);
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`HTTP ${res.status}: ${errText.slice(0, 120)}`);
+      }
+      const data = await res.json();
 
-  saveState(); renderAll();
-  const statusEl = document.getElementById('yt-pl-status');
-  statusEl.style.display = 'block';
-  statusEl.style.background = 'rgba(52,211,153,0.1)';
-  statusEl.style.color = '#34d399';
-  statusEl.style.border = '1px solid rgba(52,211,153,0.2)';
-  statusEl.textContent = `✓ Imported ${added} new songs (${songIds.length} total in playlist)`;
-  toast(`Added ${added} songs from playlist!`, 'success');
-  btn.disabled = false;
-  setTimeout(() => closeModal('add-yt-modal'), 1800);
+      if (page === 1) {
+        playlistTitle = data.title || 'YouTube Playlist';
+      }
+
+      const videos = data.videos || [];
+      allVideos.push(...videos);
+
+      // Stop if we got fewer results than a full page (no more pages)
+      if (videos.length < 100) break;
+      page++;
+    }
+
+    if (allVideos.length === 0) {
+      throw new Error('No videos found in this playlist.');
+    }
+
+    let added = 0;
+    for (const v of allVideos) {
+      const vid = v.videoId;
+      const title = v.title || 'YouTube Song';
+      const author = v.author || 'YouTube';
+      if (vid && _addYTSong(vid, title, author)) added++;
+    }
+
+    // Create a matching SoundVault playlist
+    if (added > 0) {
+      const plId = baseUrl.split('/api/v1/playlists/')[1] || Date.now().toString();
+      const newPl = {
+        id: 'pl_yt_' + plId.slice(0, 8) + '_' + Date.now(),
+        name: playlistTitle,
+        desc: 'Imported via Invidious API',
+        emoji: '▶️',
+        songs: allVideos
+          .map(v => 'yt_' + v.videoId)
+          .filter(id => state.songs.find(s => s.id === id))
+      };
+      state.playlists.push(newPl);
+    }
+
+    saveState(); renderAll();
+    statusEl.style.background = 'rgba(52,211,153,0.1)';
+    statusEl.style.color = '#34d399';
+    statusEl.style.border = '1px solid rgba(52,211,153,0.2)';
+    statusEl.textContent = `✓ Imported ${added} songs from "${playlistTitle}"`;
+    toast(`Added ${added} songs from playlist!`, 'success');
+    setTimeout(() => closeModal('add-yt-modal'), 1800);
+  } catch(e) {
+    statusEl.style.background = 'rgba(255,100,100,0.1)';
+    statusEl.style.color = '#ff6464';
+    statusEl.style.border = '1px solid rgba(255,100,100,0.2)';
+    statusEl.textContent = `Error: ${e.message}`;
+    toast('Playlist import failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ===== STATS VIEW =====
@@ -2290,21 +2134,17 @@ function loadAndPlay(song) {
   }
 
   if (src) {
-    // Pause first so any in-flight play() promise resolves before we load a new src
     audio.pause();
     audio.src = src;
-
     const onCanPlay = () => {
       audio.removeEventListener('canplay', onCanPlay);
       audio.play().then(() => {
         state.isPlaying = true;
         updatePlayerUI();
       }).catch(e => {
-        // AbortError just means another load started before this one played — ignore it
         if (e.name !== 'AbortError') toast('Cannot play audio: ' + e.message, 'error');
       });
     };
-
     audio.addEventListener('canplay', onCanPlay);
     audio.load();
   } else {
@@ -2835,25 +2675,16 @@ function closeModal(id) {
   document.getElementById(id)?.classList.remove('open');
   activeModal = null;
   if (id === 'add-yt-modal') {
-    _plVideos = [];
-    _plFetching = false;
-    const preview = document.getElementById('yt-pl-preview');
-    const meta = document.getElementById('yt-pl-meta');
-    const prog = document.getElementById('yt-pl-progress');
-    const st = document.getElementById('yt-pl-status');
-    const urlInp = document.getElementById('yt-pl-url');
-    if (preview) { preview.style.display = 'none'; preview.innerHTML = ''; }
-    if (meta) meta.style.display = 'none';
-    if (prog) prog.style.display = 'none';
-    if (st) st.style.display = 'none';
-    if (urlInp) urlInp.value = '';
+    _plVideos = []; _plFetching = false;
+    ['yt-pl-preview','yt-pl-meta','yt-pl-progress','yt-pl-status'].forEach(i => {
+      const el = document.getElementById(i); if (el) { el.style.display = 'none'; if (i==='yt-pl-preview') el.innerHTML=''; }
+    });
+    const u = document.getElementById('yt-pl-url'); if (u) u.value = '';
   }
 }
 
 document.addEventListener('click', e => {
-  if (e.target.classList.contains('modal-backdrop')) {
-    closeModal(activeModal);
-  }
+  if (e.target.classList.contains('modal-backdrop')) closeModal(activeModal);
 });
 
 document.addEventListener('keydown', e => {
@@ -2862,6 +2693,171 @@ document.addEventListener('keydown', e => {
     e.preventDefault(); togglePlay();
   }
 });
+
+// ===== SMART PLAYLIST EXTRACTOR =====
+let _plVideos = [], _plFetching = false, _plDebounce = null;
+
+function onPlUrlChange() {
+  clearTimeout(_plDebounce);
+  _plDebounce = setTimeout(_triggerPlFetch, 700);
+}
+
+function _plSetProgress(pct, text) {
+  const bar = document.getElementById('yt-pl-progress-bar');
+  const txt = document.getElementById('yt-pl-progress-text');
+  if (bar) bar.style.width = pct + '%';
+  if (txt) txt.textContent = text;
+}
+
+function _plShowError(msg) {
+  const st = document.getElementById('yt-pl-status');
+  if (st) { st.style.display='block'; st.style.background='rgba(255,100,100,0.1)'; st.style.color='#ff6464'; st.style.border='1px solid rgba(255,100,100,0.2)'; st.innerHTML=msg; }
+  const prog = document.getElementById('yt-pl-progress'); if (prog) prog.style.display='none';
+  document.getElementById('yt-add-btn').disabled = (activeYtTab === 'playlist');
+}
+
+function _extractPlaylistId(url) {
+  url = (url||'').trim();
+  try { const list = new URL(url).searchParams.get('list'); if (list) return list; } catch {}
+  const m = url.match(/[?&]list=([^&\s]+)/); if (m) return m[1];
+  if (/^PL[a-zA-Z0-9_-]{10,}$/.test(url)) return url;
+  return null;
+}
+
+async function _tryInvidious(id) {
+  const INSTANCES = ['https://invidious.fdn.fr','https://yewtu.be','https://invidious.lunar.icu','https://inv.tux.pizza','https://invidious.privacyredirect.com','https://invidious.perennialte.ch','https://iv.melmac.space','https://yt.artemislena.eu','https://invidious.reallyaweso.me','https://invidious.nerdvpn.de','https://invidious.io.lol','https://inv.nadeko.net'];
+  for (const base of INSTANCES) {
+    try {
+      const videos = []; let page=1, name='Playlist';
+      while (page<=20) {
+        const r = await fetch(`${base}/api/v1/playlists/${id}?page=${page}`,{signal:AbortSignal.timeout(7000)});
+        if (!r.ok) break;
+        const d = await r.json();
+        if (page===1) name = d.title||'Playlist';
+        const vids = d.videos||[]; if (!vids.length) break;
+        vids.forEach(v => { if (v.videoId) videos.push({title:v.title||'',videoId:v.videoId,artist:v.author||'YouTube'}); });
+        _plSetProgress(30+page*3,`Fetching… ${videos.length} videos`);
+        if (vids.length<100) break; page++;
+      }
+      if (videos.length) return {videos, name, source:'Invidious'};
+    } catch { continue; }
+  }
+  return null;
+}
+
+async function _tryRSSProxy(id) {
+  const rssUrl = `https://www.youtube.com/feeds/videos.xml?playlist_id=${id}`;
+  const proxies = [`https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`,`https://corsproxy.io/?${encodeURIComponent(rssUrl)}`,`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rssUrl)}`];
+  for (const proxy of proxies) {
+    try {
+      const r = await fetch(proxy,{signal:AbortSignal.timeout(8000)}); if (!r.ok) continue;
+      const j = await r.json().catch(()=>null);
+      const xmlStr = j?(j.contents||j.data||''):await r.text();
+      if (!xmlStr||!xmlStr.includes('<entry>')) continue;
+      const xml = new DOMParser().parseFromString(xmlStr,'application/xml');
+      const videos = [];
+      xml.querySelectorAll('entry').forEach(entry => {
+        const idEl = entry.getElementsByTagNameNS('http://www.youtube.com/xml/schemas/2015','videoId')[0];
+        const vid = (idEl?.textContent||'').trim();
+        const title = entry.querySelector('title')?.textContent||'';
+        if (vid) videos.push({title, videoId:vid, artist:'YouTube'});
+      });
+      const name = xml.querySelector('title')?.textContent||'Playlist';
+      if (videos.length) return {videos, name, source:'RSS'};
+    } catch { continue; }
+  }
+  return null;
+}
+
+async function _tryScrapeProxy(id) {
+  const ytUrl = `https://www.youtube.com/playlist?list=${id}`;
+  const proxies = [`https://api.allorigins.win/get?url=${encodeURIComponent(ytUrl)}`,`https://corsproxy.io/?${encodeURIComponent(ytUrl)}`];
+  for (const proxy of proxies) {
+    try {
+      const r = await fetch(proxy,{signal:AbortSignal.timeout(10000)}); if (!r.ok) continue;
+      const j = await r.json().catch(()=>null);
+      const html = j?(j.contents||''):await r.text(); if (!html) continue;
+      const name = (html.match(/<title>([^<]+)<\/title>/)||[])[1]?.replace(' - YouTube','')||'Playlist';
+      const ids = [...new Set([...html.matchAll(/"videoId":"([a-zA-Z0-9_-]{11})"/g)].map(m=>m[1]))];
+      const titles = [...html.matchAll(/"title":\{"runs":\[{"text":"([^"]+)"\}/g)].map(m=>m[1]);
+      const videos = ids.map((vid,i)=>({videoId:vid,title:titles[i]||'',artist:'YouTube'}));
+      if (videos.length) return {videos, name, source:'Scraped'};
+    } catch { continue; }
+  }
+  return null;
+}
+
+async function _fetchPlaylist(id) {
+  _plSetProgress(10,'Trying Invidious API…');
+  let r = await _tryInvidious(id); if (r) return r;
+  _plSetProgress(55,'Trying RSS feed…');
+  r = await _tryRSSProxy(id); if (r) return r;
+  _plSetProgress(75,'Trying page scrape…');
+  r = await _tryScrapeProxy(id); if (r) return r;
+  throw new Error('All methods failed. Make sure the playlist is <b>Public</b> on YouTube.');
+}
+
+async function _triggerPlFetch() {
+  if (_plFetching) return;
+  const url = document.getElementById('yt-pl-url').value.trim();
+  const preview = document.getElementById('yt-pl-preview');
+  const meta = document.getElementById('yt-pl-meta');
+  const prog = document.getElementById('yt-pl-progress');
+  const st = document.getElementById('yt-pl-status');
+  preview.style.display='none'; preview.innerHTML='';
+  meta.style.display='none'; if(st) st.style.display='none';
+  document.getElementById('yt-add-btn').disabled = true;
+  _plVideos = [];
+  if (!url) return;
+  const listId = _extractPlaylistId(url);
+  if (!listId) { _plShowError('No playlist ID found. Paste a YouTube playlist URL containing <b>list=PL…</b>'); return; }
+  prog.style.display = 'flex'; _plFetching = true;
+  try {
+    const result = await _fetchPlaylist(listId);
+    _plFetching = false; _plVideos = result.videos;
+    if (!_plVideos.length) { _plShowError('Playlist found but 0 videos returned. It may be private.'); return; }
+    _plSetProgress(100, `✓ ${_plVideos.length} videos via ${result.source}`);
+    preview.innerHTML = _plVideos.map((v,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 11px;border-bottom:1px solid var(--border);font-size:12px;"><span style="font-family:monospace;font-size:10px;color:var(--text3);min-width:24px;">${i+1}</span><span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${v.title}">${v.title||'(no title)'}</span><span style="font-family:monospace;font-size:10px;color:var(--accent);flex-shrink:0;">${v.videoId}</span></div>`).join('');
+    preview.style.display = 'block';
+    meta.style.display = 'flex';
+    meta.innerHTML = `<strong style="color:var(--text);">${result.name}</strong><span style="background:rgba(52,211,153,0.15);color:#34d399;border:1px solid rgba(52,211,153,0.3);border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;font-family:monospace;">${_plVideos.length} videos</span>`;
+    document.getElementById('yt-add-btn').disabled = false;
+    setTimeout(()=>{ prog.style.display='none'; }, 2000);
+  } catch(e) {
+    _plFetching = false;
+    _plShowError(e.message||'Failed to fetch playlist.');
+  }
+}
+
+async function addYTPlaylist() {
+  if (!_plVideos.length) {
+    const url = document.getElementById('yt-pl-url').value.trim();
+    if (!url) { toast('Paste a YouTube playlist URL first','error'); return; }
+    await _triggerPlFetch();
+    if (!_plVideos.length) return;
+  }
+  const useTitle = document.getElementById('yt-pl-use-title').checked;
+  const btn = document.getElementById('yt-add-btn');
+  btn.disabled = true;
+  let added = 0; const songIds = [];
+  for (const v of _plVideos) {
+    const title = useTitle && v.title ? v.title : 'YouTube Song';
+    if (v.videoId && _addYTSong(v.videoId, title, v.artist||'YouTube')) added++;
+    const sid = 'yt_' + v.videoId;
+    if (state.songs.find(s=>s.id===sid)) songIds.push(sid);
+  }
+  if (songIds.length > 0) {
+    const rawName = document.getElementById('yt-pl-meta')?.querySelector('strong')?.textContent || 'YouTube Playlist';
+    state.playlists.push({ id:'pl_yt_'+Date.now(), name:rawName, desc:'Imported from YouTube', emoji:'▶️', songs:songIds });
+  }
+  saveState(); renderAll();
+  const st = document.getElementById('yt-pl-status');
+  st.style.display='block'; st.style.background='rgba(52,211,153,0.1)'; st.style.color='#34d399'; st.style.border='1px solid rgba(52,211,153,0.2)';
+  st.textContent=`✓ Imported ${added} new songs (${songIds.length} total in playlist)`;
+  toast(`Added ${added} songs from playlist!`,'success');
+  btn.disabled = false;
+  setTimeout(()=>closeModal('add-yt-modal'), 1800);
+}
 
 // ===== TABS =====
 function switchTab(group, tab) {
