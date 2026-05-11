@@ -1041,6 +1041,347 @@ input[type=color] {
 }
 
 .big-play-btn:hover { transform: scale(1.06); }
+
+/* ===== MOBILE UI (≤768px) ===== */
+@media (max-width: 768px) {
+  /* Hide desktop sidebar and restructure layout */
+  .sidebar { display: none !important; }
+
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto auto;
+  }
+
+  .main-content {
+    grid-column: 1;
+    padding: 16px;
+    padding-bottom: 160px; /* space for player + bottom nav */
+  }
+
+  /* Hide desktop player bar */
+  .player-bar { display: none !important; }
+
+  /* ── MOBILE PLAYER ── */
+  .mobile-player {
+    display: flex !important;
+    position: fixed;
+    bottom: 60px; /* above bottom nav */
+    left: 0; right: 0;
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    padding: 10px 16px;
+    align-items: center;
+    gap: 12px;
+    z-index: 90;
+    backdrop-filter: blur(20px);
+  }
+
+  .mobile-player-art {
+    width: 44px; height: 44px;
+    border-radius: 8px;
+    background: var(--surface);
+    display: grid;
+    place-items: center;
+    font-size: 18px;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .mobile-player-art img { width: 100%; height: 100%; object-fit: cover; }
+
+  .mobile-player-info {
+    flex: 1;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .mobile-player-title {
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-player-artist {
+    font-size: 11px;
+    color: var(--text2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-player-progress {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--surface2);
+  }
+
+  .mobile-player-progress-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.5s linear;
+  }
+
+  .mobile-play-btn {
+    width: 40px; height: 40px;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 50%;
+    font-size: 16px;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .mobile-next-btn {
+    width: 36px; height: 36px;
+    background: none;
+    border: none;
+    color: var(--text2);
+    font-size: 18px;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  /* ── BOTTOM NAV ── */
+  .mobile-nav {
+    display: flex !important;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    z-index: 100;
+    height: 60px;
+  }
+
+  .mobile-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    transition: var(--transition);
+    border: none;
+    background: none;
+    padding: 0;
+  }
+
+  .mobile-nav-item i { font-size: 18px; }
+  .mobile-nav-item.active { color: var(--accent); }
+
+  /* ── FULL PLAYER SHEET ── */
+  .mobile-player-sheet {
+    display: flex !important;
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 200;
+    flex-direction: column;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  .mobile-player-sheet.open {
+    transform: translateY(0);
+  }
+
+  .sheet-handle {
+    width: 36px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 14px auto 0;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .sheet-art {
+    width: min(280px, 70vw);
+    height: min(280px, 70vw);
+    border-radius: 16px;
+    background: var(--surface2);
+    margin: 24px auto 28px;
+    display: grid;
+    place-items: center;
+    font-size: 72px;
+    overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    flex-shrink: 0;
+  }
+
+  .sheet-art img { width: 100%; height: 100%; object-fit: cover; border-radius: 16px; }
+  .sheet-art.pulse { animation: pulse-art 2s ease-in-out infinite; }
+
+  .sheet-meta {
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .sheet-meta-text { flex: 1; overflow: hidden; }
+
+  .sheet-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 800;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sheet-artist {
+    font-size: 14px;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+
+  .sheet-heart {
+    font-size: 22px;
+    color: var(--text3);
+    cursor: pointer;
+    background: none;
+    border: none;
+    flex-shrink: 0;
+    transition: var(--transition);
+  }
+
+  .sheet-heart.liked { color: var(--accent2); }
+
+  .sheet-progress {
+    padding: 0 28px;
+    margin-bottom: 8px;
+  }
+
+  .sheet-progress-track {
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .sheet-progress-track:active { height: 6px; }
+
+  .sheet-progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.5s linear;
+    pointer-events: none;
+  }
+
+  .sheet-times {
+    padding: 6px 28px 0;
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text3);
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 28px;
+  }
+
+  .sheet-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 0 28px;
+    margin-bottom: 24px;
+  }
+
+  .sheet-ctrl {
+    width: 44px; height: 44px;
+    background: none;
+    border: none;
+    color: var(--text2);
+    font-size: 20px;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: var(--transition);
+  }
+
+  .sheet-ctrl.active { color: var(--accent); }
+  .sheet-ctrl:active { background: var(--glass); }
+
+  .sheet-play-btn {
+    width: 68px; height: 68px;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 50%;
+    font-size: 26px;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    box-shadow: 0 6px 24px rgba(var(--accent-rgb), 0.5);
+    transition: var(--transition);
+  }
+
+  .sheet-play-btn:active { transform: scale(0.94); }
+
+  .sheet-volume {
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .sheet-volume i { color: var(--text3); font-size: 16px; width: 20px; text-align: center; }
+
+  .sheet-vol-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--surface2);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .sheet-vol-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+
+  /* Adjust page titles on mobile */
+  .page-title { font-size: 22px; margin-bottom: 4px; }
+  .page-subtitle { font-size: 13px; margin-bottom: 20px; }
+
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px; }
+  .stat-value { font-size: 22px; }
+
+  .recent-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+
+  /* Library list columns on mobile */
+  .song-list-header { display: none; }
+  .song-list-item {
+    grid-template-columns: 44px 1fr 36px;
+    gap: 10px;
+    padding: 10px 8px;
+  }
+  .item-num, .item-album, .item-plays, .item-duration { display: none; }
+  .item-thumb { width: 44px; height: 44px; }
+}
 </style>
 </head>
 <body>
@@ -1540,6 +1881,73 @@ input[type=color] {
   </div>
 </div>
 
+
+<!-- ===== MOBILE MINI PLAYER ===== -->
+<div class="mobile-player" style="display:none;" id="mobile-player" onclick="openPlayerSheet()">
+  <div class="mobile-player-art" id="mobile-player-art"><i class="fas fa-music" style="color:var(--text3)"></i></div>
+  <div class="mobile-player-info">
+    <div class="mobile-player-title" id="mobile-player-title">No song playing</div>
+    <div class="mobile-player-artist" id="mobile-player-artist">—</div>
+  </div>
+  <button class="mobile-play-btn" id="mobile-play-btn" onclick="event.stopPropagation();togglePlay()"><i class="fas fa-play"></i></button>
+  <button class="mobile-next-btn" onclick="event.stopPropagation();nextSong()"><i class="fas fa-step-forward"></i></button>
+  <div class="mobile-player-progress">
+    <div class="mobile-player-progress-fill" id="mobile-progress-fill"></div>
+  </div>
+</div>
+
+<!-- ===== MOBILE BOTTOM NAV ===== -->
+<nav class="mobile-nav" style="display:none;" id="mobile-nav">
+  <button class="mobile-nav-item active" id="mnav-dashboard" onclick="switchView('dashboard');setMobileNav('dashboard')">
+    <i class="fas fa-home"></i><span>Home</span>
+  </button>
+  <button class="mobile-nav-item" id="mnav-library" onclick="switchView('library');setMobileNav('library')">
+    <i class="fas fa-music"></i><span>Library</span>
+  </button>
+  <button class="mobile-nav-item" id="mnav-youtube" onclick="switchView('youtube');setMobileNav('youtube')">
+    <i class="fas fa-headphones"></i><span>Online</span>
+  </button>
+  <button class="mobile-nav-item" id="mnav-playlists" onclick="switchView('playlists-mobile');setMobileNav('playlists')">
+    <i class="fas fa-list"></i><span>Playlists</span>
+  </button>
+  <button class="mobile-nav-item" id="mnav-settings" onclick="switchView('settings');setMobileNav('settings')">
+    <i class="fas fa-cog"></i><span>Settings</span>
+  </button>
+</nav>
+
+<!-- ===== MOBILE FULL PLAYER SHEET ===== -->
+<div class="mobile-player-sheet" id="mobile-player-sheet">
+  <div class="sheet-handle" onclick="closePlayerSheet()"></div>
+  <div class="sheet-art" id="sheet-art"><i class="fas fa-music" style="color:var(--text3);font-size:64px;"></i></div>
+  <div class="sheet-meta">
+    <div class="sheet-meta-text">
+      <div class="sheet-title" id="sheet-title">No song playing</div>
+      <div class="sheet-artist" id="sheet-artist">—</div>
+    </div>
+    <button class="sheet-heart" id="sheet-heart" onclick="toggleLike()"><i class="fas fa-heart"></i></button>
+  </div>
+  <div class="sheet-progress">
+    <div class="sheet-progress-track" id="sheet-progress-track" onclick="seekTo(event)">
+      <div class="sheet-progress-fill" id="sheet-progress-fill"></div>
+    </div>
+  </div>
+  <div class="sheet-times">
+    <span id="sheet-time-current">0:00</span>
+    <span id="sheet-time-total">0:00</span>
+  </div>
+  <div class="sheet-controls">
+    <button class="sheet-ctrl" id="sheet-shuffle" onclick="toggleShuffle()" title="Shuffle"><i class="fas fa-random"></i></button>
+    <button class="sheet-ctrl" onclick="prevSong()"><i class="fas fa-step-backward"></i></button>
+    <button class="sheet-play-btn" id="sheet-play-btn" onclick="togglePlay()"><i class="fas fa-play"></i></button>
+    <button class="sheet-ctrl" onclick="nextSong()"><i class="fas fa-step-forward"></i></button>
+    <button class="sheet-ctrl" id="sheet-repeat" onclick="toggleRepeat()"><i class="fas fa-redo"></i></button>
+  </div>
+  <div class="sheet-volume">
+    <i class="fas fa-volume-down" id="sheet-vol-icon"></i>
+    <input type="range" class="sheet-vol-slider" min="0" max="100" value="80" oninput="setVolume(this.value)">
+  </div>
+</div>
+
 <!-- TOAST CONTAINER -->
 <div class="toast-container" id="toast-container"></div>
 
@@ -1597,7 +2005,6 @@ function init() {
   loadState();
   applyTheme(state.theme, false);
   applyAccent(state.accent, state.accentRgb, false);
-  audio.volume = (state.volume || 80) / 100;
   document.getElementById('vol-slider').value = state.volume || 80;
   updateGreeting();
   renderAll();
@@ -2122,26 +2529,7 @@ function playSongFromLibrary(id) {
   if (song) playSong(song);
 }
 
-const INV_INSTANCES = [
-  'https://inv.tux.pizza',
-  'https://invidious.fdn.fr',
-  'https://yewtu.be',
-  'https://invidious.lunar.icu',
-  'https://invidious.privacyredirect.com',
-  'https://iv.melmac.space',
-  'https://invidious.nerdvpn.de',
-  'https://invidious.io.lol',
-  'https://invidious.perennialte.ch',
-  'https://yt.artemislena.eu',
-  'https://invidious.reallyaweso.me',
-  'https://inv.nadeko.net',
-];
-
-const PIPED_INSTANCES = [
-  'https://pipedapi.kavin.rocks',
-  'https://pipedapi.tokhmi.xyz',
-  'https://pipedapi.moomoo.me',
-];
+// All playback goes through YouTube IFrame API
 
 // ===== YT IFRAME API FALLBACK =====
 let _ytIframeActive = false;
@@ -2202,10 +2590,20 @@ function _startYTProgressTracker() {
         if (fill) fill.style.width = pct + '%';
         if (tc) tc.textContent = formatTime(cur);
         if (tt) tt.textContent = formatTime(dur);
+        updateMobileProgress(cur, dur);
       }
       if (state.currentSong && state.isPlaying) {
         const s = state.songs.find(s => s.id === state.currentSong.id);
-        if (s) s.playTime = (s.playTime || 0) + 0.5;
+        if (s) {
+          s.playTime = (s.playTime || 0) + 0.5;
+          // Count as a play only once per song load, when 90% complete
+          if (!state._playCountedForCurrentSong && dur > 0 && (cur / dur) >= 0.9) {
+            state._playCountedForCurrentSong = true;
+            s.plays = (s.plays || 0) + 1;
+            saveState();
+            updateStats();
+          }
+        }
       }
     } catch(e) {}
   }, 500);
@@ -2266,169 +2664,32 @@ async function _playViaYTIframe(song) {
   toast('Streaming via YouTube (fallback mode)', 'info');
 }
 
-function _tryPlaySrc(song, src) {
-  return new Promise((resolve, reject) => {
-    audio.pause();
-    audio.src = src;
-    const onCanPlay = () => {
-      cleanup();
-      audio.play().then(resolve).catch(e => {
-        if (e.name === 'AbortError') resolve(); else reject(e);
-      });
-    };
-    const onError = () => { cleanup(); reject(new Error('Source failed')); };
-    const cleanup = () => {
-      audio.removeEventListener('canplay', onCanPlay);
-      audio.removeEventListener('error', onError);
-      clearTimeout(timer);
-    };
-    audio.addEventListener('canplay', onCanPlay);
-    audio.addEventListener('error', onError);
-    audio.load();
-    // 6s timeout — faster fail so we move to next source quicker
-    const timer = setTimeout(() => { cleanup(); reject(new Error('Timeout')); }, 6000);
-  });
-}
-
-// Try to resolve a direct audio URL via Piped API
-async function _tryPipedAudio(ytId) {
-  for (const base of PIPED_INSTANCES) {
-    try {
-      const r = await fetch(`${base}/streams/${ytId}`, { signal: AbortSignal.timeout(5000) });
-      if (!r.ok) continue;
-      const data = await r.json();
-      // audioStreams sorted by quality; pick highest bitrate m4a/webm
-      const streams = (data.audioStreams || []).filter(s => s.url);
-      if (!streams.length) continue;
-      streams.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
-      return streams[0].url;
-    } catch { continue; }
-  }
-  return null;
-}
-
 async function loadAndPlay(song) {
   if (!song) return;
-
-  // Destroy any existing YT API player
   if (_ytPlayer) _destroyYTPlayer();
-
   state.currentSong = song;
+  state._playCountedForCurrentSong = false; // reset 90% tracker
   updatePlayerUI();
-
-  if (!song.isYT) {
-    const src = song.url || null;
-    if (!src) { toast('No audio source for this song', 'info'); return; }
-    try {
-      await _tryPlaySrc(song, src);
-      state.isPlaying = true;
-    } catch(e) {
-      toast('Cannot play: ' + e.message, 'error');
-      state.isPlaying = false;
-    }
-    updatePlayerUI();
-    recordPlay(song);
-    return;
-  }
-
-  // ── YouTube song: multi-strategy streaming ──
-  // Strategy 1: Last known working Invidious instance first
-  const preferred = state.invidiousBase
-    ? [state.invidiousBase, ...INV_INSTANCES.filter(i => i !== state.invidiousBase)]
-    : INV_INSTANCES;
-
-  // Try first 3 Invidious instances in parallel for speed
-  const firstBatch = preferred.slice(0, 3);
-  const restBatch  = preferred.slice(3);
-
-  let played = false;
-
-  // Parallel race on first 3
-  const raceResult = await Promise.any(firstBatch.map(async base => {
-    const src = `${base}/latest_version?id=${song.ytId}&itag=140`;
-    await _tryPlaySrc(song, src);
-    return base;
-  })).catch(() => null);
-
-  if (raceResult) {
-    state.invidiousBase = raceResult;
-    state.isPlaying = true;
-    played = true;
-  }
-
-  // Strategy 2: Sequential fallback through remaining Invidious instances
-  if (!played) {
-    for (const base of restBatch) {
-      const src = `${base}/latest_version?id=${song.ytId}&itag=140`;
-      try {
-        await _tryPlaySrc(song, src);
-        state.invidiousBase = base;
-        state.isPlaying = true;
-        played = true;
-        break;
-      } catch { continue; }
-    }
-  }
-
-  // Strategy 3: Piped API (get a direct CDN URL)
-  if (!played) {
-    toast('Invidious unavailable, trying Piped…', 'info');
-    try {
-      const directUrl = await _tryPipedAudio(song.ytId);
-      if (directUrl) {
-        await _tryPlaySrc(song, directUrl);
-        state.isPlaying = true;
-        played = true;
-      }
-    } catch { /* fall through */ }
-  }
-
-  // Strategy 4: YouTube embed iframe as last resort
-  if (!played) {
-    _playViaYTIframe(song);
-    recordPlay(song);
-    return; // UI updated inside _playViaYTIframe
-  }
-
-  updatePlayerUI();
-  recordPlay(song);
+  await _playViaYTIframe(song);
 }
 
 
 
 
 function recordPlay(song) {
-  const s = state.songs.find(s => s.id === song.id);
-  if (s) {
-    s.plays = (s.plays || 0) + 1;
-    saveState();
-    updateStats();
-  }
+  // Play is counted at 90% completion via _startYTProgressTracker
 }
 
 function togglePlay() {
-  if (!state.currentSong) return;
-  if (_ytIframeActive && _ytPlayer) {
-    if (state.isPlaying) _ytPlayer.pauseVideo();
-    else _ytPlayer.playVideo();
-    return; // state/UI updated via onStateChange callback
-  }
-  if (state.isPlaying) {
-    audio.pause();
-    state.isPlaying = false;
-  } else {
-    audio.play().catch(() => {});
-    state.isPlaying = true;
-  }
-  updatePlayerUI();
+  if (!state.currentSong || !_ytPlayer) return;
+  if (state.isPlaying) _ytPlayer.pauseVideo();
+  else _ytPlayer.playVideo();
+  // state/UI updated via onStateChange callback
 }
 
 function nextSong() {
-  if (_ytIframeActive && _ytPlayer && state.repeatMode === 2) {
+  if (state.repeatMode === 2 && _ytPlayer) {
     _ytPlayer.seekTo(0); _ytPlayer.playVideo(); return;
-  }
-  if (state.repeatMode === 2) {
-    audio.currentTime = 0; audio.play(); return;
   }
   if (state.isShuffle) {
     state.queueIndex = Math.floor(Math.random() * state.queue.length);
@@ -2439,11 +2700,9 @@ function nextSong() {
 }
 
 function prevSong() {
-  if (_ytIframeActive && _ytPlayer) {
+  if (_ytPlayer) {
     const cur = _ytPlayer.getCurrentTime() || 0;
     if (cur > 3) { _ytPlayer.seekTo(0); return; }
-  } else if (audio.currentTime > 3) {
-    audio.currentTime = 0; return;
   }
   state.queueIndex = (state.queueIndex - 1 + state.queue.length) % state.queue.length;
   if (state.queue.length > 0) loadAndPlay(state.queue[state.queueIndex]);
@@ -2478,28 +2737,18 @@ function toggleLike() {
 }
 
 function seekTo(event) {
+  if (!_ytPlayer) return;
   const track = document.getElementById('progress-track');
   const rect = track.getBoundingClientRect();
   const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-  if (_ytIframeActive && _ytPlayer) {
-    const dur = _ytPlayer.getDuration() || 0;
-    if (dur > 0) _ytPlayer.seekTo(ratio * dur, true);
-    return;
-  }
-  if (!audio.duration) return;
-  audio.currentTime = ratio * audio.duration;
+  const dur = _ytPlayer.getDuration() || 0;
+  if (dur > 0) _ytPlayer.seekTo(ratio * dur, true);
 }
 
 function setVolume(val) {
   state.volume = parseInt(val);
   state.isMuted = false;
-  if (_ytIframeActive && _ytPlayer) {
-    _ytPlayer.setVolume(state.volume);
-    _ytPlayer.unMute();
-  } else {
-    audio.volume = state.volume / 100;
-    audio.muted = false;
-  }
+  if (_ytPlayer) { _ytPlayer.setVolume(state.volume); _ytPlayer.unMute(); }
   const icon = document.getElementById('vol-icon');
   icon.className = state.volume === 0 ? 'fas fa-volume-mute' : state.volume < 50 ? 'fas fa-volume-down' : 'fas fa-volume-up';
   saveState();
@@ -2507,11 +2756,7 @@ function setVolume(val) {
 
 function toggleMute() {
   state.isMuted = !state.isMuted;
-  if (_ytIframeActive && _ytPlayer) {
-    if (state.isMuted) _ytPlayer.mute(); else _ytPlayer.unMute();
-  } else {
-    audio.muted = state.isMuted;
-  }
+  if (_ytPlayer) { if (state.isMuted) _ytPlayer.mute(); else _ytPlayer.unMute(); }
   document.getElementById('vol-icon').className = state.isMuted ? 'fas fa-volume-mute' : 'fas fa-volume-up';
 }
 
@@ -2524,7 +2769,7 @@ function updatePlayerUI() {
   if (song.art) {
     artEl.innerHTML = `<img src="${song.art}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'">`;
   } else {
-    artEl.innerHTML = song.isYT ? '▶️' : '<i class="fas fa-music" style="color:var(--text3)"></i>';
+    artEl.innerHTML = '▶️';
   }
   artEl.classList.toggle('playing-pulse', state.isPlaying);
   
@@ -2536,32 +2781,10 @@ function updatePlayerUI() {
   
   renderLibrary();
   renderDashboard();
+  updateMobilePlayerUI();
 }
 
-// ===== AUDIO EVENTS =====
-audio.addEventListener('timeupdate', () => {
-  if (!audio.duration) return;
-  const pct = (audio.currentTime / audio.duration) * 100;
-  document.getElementById('progress-fill').style.width = pct + '%';
-  document.getElementById('time-current').textContent = formatTime(audio.currentTime);
-  document.getElementById('time-total').textContent = formatTime(audio.duration);
-
-  // Track play time
-  if (state.currentSong && state.isPlaying) {
-    const s = state.songs.find(s => s.id === state.currentSong.id);
-    if (s) { s.playTime = (s.playTime || 0) + 1/10; }
-  }
-});
-
-audio.addEventListener('ended', () => {
-  saveState();
-  if (state.repeatMode === 2) { audio.currentTime = 0; audio.play(); }
-  else if (state.settings.autoplay !== false) nextSong();
-  else { state.isPlaying = false; updatePlayerUI(); }
-});
-
-audio.addEventListener('play', () => { state.isPlaying = true; updatePlayerUI(); });
-audio.addEventListener('pause', () => { state.isPlaying = false; updatePlayerUI(); });
+// Audio events handled by YouTube IFrame API (onStateChange, progress timer)
 
 // ===== SONG MANAGEMENT =====
 function addSong() {
@@ -2646,7 +2869,7 @@ function removeSong(id) {
   if (!confirm('Remove this song?')) return;
   state.songs = state.songs.filter(s => s.id !== id);
   state.playlists.forEach(pl => { pl.songs = pl.songs.filter(sid => sid !== id); });
-  if (state.currentSong?.id === id) { audio.pause(); state.currentSong = null; state.isPlaying = false; updatePlayerUI(); }
+  if (state.currentSong?.id === id) { if (_ytPlayer) _destroyYTPlayer(); state.currentSong = null; state.isPlaying = false; updatePlayerUI(); }
   saveState(); renderAll();
   toast('Song removed', 'success');
 }
@@ -2785,8 +3008,8 @@ function clearData() {
   state.songs = [];
   state.playlists = [];
   state.currentSong = null;
-  audio.pause();
-  audio.src = '';
+  if (_ytPlayer) _destroyYTPlayer();
+  state.isPlaying = false;
   saveState(); renderAll();
   toast('All data cleared', 'info');
 }
@@ -3156,6 +3379,131 @@ function formatTime(secs) {
 
 // ===== START =====
 init();
+
+// ===== MOBILE UI =====
+const IS_MOBILE = () => window.innerWidth <= 768;
+
+function openPlayerSheet() {
+  document.getElementById('mobile-player-sheet').classList.add('open');
+}
+
+function closePlayerSheet() {
+  document.getElementById('mobile-player-sheet').classList.remove('open');
+}
+
+function setMobileNav(tab) {
+  document.querySelectorAll('.mobile-nav-item').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById('mnav-' + tab);
+  if (el) el.classList.add('active');
+}
+
+function updateMobilePlayerUI() {
+  const song = state.currentSong;
+  const playing = state.isPlaying;
+
+  // Mini player
+  const miniPlayer = document.getElementById('mobile-player');
+  if (miniPlayer) miniPlayer.style.display = song ? 'flex' : 'none';
+
+  if (!song) return;
+
+  // Art
+  const artHtml = song.art
+    ? `<img src="${song.art}" onerror="this.style.display='none'">`
+    : '▶️';
+
+  const mArt = document.getElementById('mobile-player-art');
+  if (mArt) mArt.innerHTML = artHtml;
+
+  const sArt = document.getElementById('sheet-art');
+  if (sArt) {
+    sArt.innerHTML = song.art
+      ? `<img src="${song.art}" onerror="this.style.display='none'">`
+      : '<i class="fas fa-music" style="color:var(--text3);font-size:64px;"></i>';
+    sArt.classList.toggle('pulse', playing);
+  }
+
+  // Title / artist
+  const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setText('mobile-player-title', song.title);
+  setText('mobile-player-artist', song.artist || '—');
+  setText('sheet-title', song.title);
+  setText('sheet-artist', song.artist || '—');
+
+  // Play buttons
+  const icon = playing ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
+  const mbtn = document.getElementById('mobile-play-btn');
+  if (mbtn) mbtn.innerHTML = icon;
+  const sbtn = document.getElementById('sheet-play-btn');
+  if (sbtn) sbtn.innerHTML = icon;
+
+  // Heart
+  const sh = document.getElementById('sheet-heart');
+  if (sh) sh.classList.toggle('liked', song.liked || false);
+
+  // Shuffle/repeat in sheet
+  const sshuffle = document.getElementById('sheet-shuffle');
+  if (sshuffle) sshuffle.classList.toggle('active', state.isShuffle);
+  const srepeat = document.getElementById('sheet-repeat');
+  if (srepeat) {
+    srepeat.classList.toggle('active', state.repeatMode > 0);
+    srepeat.innerHTML = state.repeatMode === 2
+      ? '<i class="fas fa-redo"></i><span class="shuffle-indicator">1</span>'
+      : '<i class="fas fa-redo"></i>';
+  }
+}
+
+function updateMobileProgress(cur, dur) {
+  const pct = dur > 0 ? (cur / dur) * 100 : 0;
+  const pctStr = pct + '%';
+
+  const mFill = document.getElementById('mobile-progress-fill');
+  if (mFill) mFill.style.width = pctStr;
+
+  const sFill = document.getElementById('sheet-progress-fill');
+  if (sFill) sFill.style.width = pctStr;
+
+  const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setText('sheet-time-current', formatTime(cur));
+  setText('sheet-time-total', formatTime(dur));
+}
+
+// Patch seekTo to also work from sheet progress track
+const _origSeekTo = seekTo;
+function seekTo(event) {
+  const isSheet = event.currentTarget && event.currentTarget.id === 'sheet-progress-track';
+  if (_ytPlayer && isSheet) {
+    const track = event.currentTarget;
+    const rect = track.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+    const dur = _ytPlayer.getDuration() || 0;
+    if (dur > 0) _ytPlayer.seekTo(ratio * dur, true);
+    return;
+  }
+  _origSeekTo(event);
+}
+
+// Show/hide mobile elements based on viewport
+function applyResponsiveLayout() {
+  const mobile = IS_MOBILE();
+  const nav = document.getElementById('mobile-nav');
+  if (nav) nav.style.display = mobile ? 'flex' : 'none';
+  // mini player visibility managed by updateMobilePlayerUI
+}
+
+window.addEventListener('resize', applyResponsiveLayout);
+applyResponsiveLayout();
+
+// Swipe down to close player sheet
+(function() {
+  let startY = 0;
+  const sheet = document.getElementById('mobile-player-sheet');
+  if (!sheet) return;
+  sheet.addEventListener('touchstart', e => { startY = e.touches[0].clientY; }, { passive: true });
+  sheet.addEventListener('touchend', e => {
+    const dy = e.changedTouches[0].clientY - startY;
+    if (dy > 80) closePlayerSheet();
+  }, { passive: true });
+})();
+
 </script>
-</body>
-</html>
