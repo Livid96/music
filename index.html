@@ -2122,37 +2122,86 @@ function playSongFromLibrary(id) {
   if (song) playSong(song);
 }
 
-function loadAndPlay(song) {
-  if (!song) return;
-  state.currentSong = song;
+const INV_INSTANCES = [
+  'https://inv.tux.pizza',
+  'https://invidious.fdn.fr',
+  'https://yewtu.be',
+  'https://invidious.lunar.icu',
+  'https://invidious.privacyredirect.com',
+  'https://iv.melmac.space',
+  'https://invidious.nerdvpn.de',
+  'https://invidious.io.lol',
+];
 
-  let src = song.url || null;
-
-  if (song.isYT) {
-    const invBase = state.invidiousBase || 'https://inv.tux.pizza';
-    src = `${invBase}/latest_version?id=${song.ytId}&itag=140`;
-  }
-
-  if (src) {
+function _tryPlaySrc(song, src) {
+  return new Promise((resolve, reject) => {
     audio.pause();
     audio.src = src;
     const onCanPlay = () => {
       audio.removeEventListener('canplay', onCanPlay);
-      audio.play().then(() => {
-        state.isPlaying = true;
-        updatePlayerUI();
-      }).catch(e => {
-        if (e.name !== 'AbortError') toast('Cannot play audio: ' + e.message, 'error');
+      audio.removeEventListener('error', onError);
+      audio.play().then(resolve).catch(e => {
+        if (e.name === 'AbortError') resolve(); else reject(e);
       });
     };
+    const onError = () => {
+      audio.removeEventListener('canplay', onCanPlay);
+      audio.removeEventListener('error', onError);
+      reject(new Error('Source failed'));
+    };
     audio.addEventListener('canplay', onCanPlay);
+    audio.addEventListener('error', onError);
     audio.load();
-  } else {
-    state.isPlaying = false;
+    // Timeout if canplay never fires (e.g. instance returns 200 but no audio)
+    setTimeout(() => { audio.removeEventListener('canplay', onCanPlay); audio.removeEventListener('error', onError); reject(new Error('Timeout')); }, 8000);
+  });
+}
+
+async function loadAndPlay(song) {
+  if (!song) return;
+  state.currentSong = song;
+  updatePlayerUI();
+
+  if (!song.isYT) {
+    // Local / URL-based song
+    const src = song.url || null;
+    if (!src) { toast('No audio source for this song', 'info'); return; }
+    try {
+      await _tryPlaySrc(song, src);
+      state.isPlaying = true;
+    } catch(e) {
+      toast('Cannot play: ' + e.message, 'error');
+      state.isPlaying = false;
+    }
     updatePlayerUI();
-    toast('No audio source for this song', 'info');
+    recordPlay(song);
+    return;
   }
 
+  // YouTube song — try Invidious instances one by one
+  // Start with the last known working instance
+  const preferred = state.invidiousBase ? [state.invidiousBase, ...INV_INSTANCES.filter(i => i !== state.invidiousBase)] : INV_INSTANCES;
+
+  let played = false;
+  for (const base of preferred) {
+    const src = `${base}/latest_version?id=${song.ytId}&itag=140`;
+    try {
+      await _tryPlaySrc(song, src);
+      state.invidiousBase = base; // remember working instance
+      state.isPlaying = true;
+      played = true;
+      break;
+    } catch {
+      continue;
+    }
+  }
+
+  if (!played) {
+    toast('Could not stream this song — all Invidious servers failed. Try again later.', 'error');
+    state.isPlaying = false;
+  }
+
+  updatePlayerUI();
   recordPlay(song);
 }
 
