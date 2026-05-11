@@ -2284,20 +2284,29 @@ function loadAndPlay(song) {
 
   let src = song.url || null;
 
-  // For YouTube songs, use Invidious latest-version audio stream
   if (song.isYT) {
-    // Try to derive the Invidious instance from state, or fall back to a public one
     const invBase = state.invidiousBase || 'https://inv.tux.pizza';
     src = `${invBase}/latest_version?id=${song.ytId}&itag=140`;
   }
 
   if (src) {
+    // Pause first so any in-flight play() promise resolves before we load a new src
+    audio.pause();
     audio.src = src;
+
+    const onCanPlay = () => {
+      audio.removeEventListener('canplay', onCanPlay);
+      audio.play().then(() => {
+        state.isPlaying = true;
+        updatePlayerUI();
+      }).catch(e => {
+        // AbortError just means another load started before this one played — ignore it
+        if (e.name !== 'AbortError') toast('Cannot play audio: ' + e.message, 'error');
+      });
+    };
+
+    audio.addEventListener('canplay', onCanPlay);
     audio.load();
-    audio.play().then(() => {
-      state.isPlaying = true;
-      updatePlayerUI();
-    }).catch(e => toast('Cannot play audio: ' + e.message, 'error'));
   } else {
     state.isPlaying = false;
     updatePlayerUI();
